@@ -1,7 +1,7 @@
 import notificationManager from '@ohos.notificationManager';
 import notification from '@ohos.notification';
 import common from '@ohos.app.ability.common';
-import promptAction from '@ohos.promptAction';
+import { PromptService } from './PromptService';
 import { StorageService } from './StorageService';
 
 export class NotificationService {
@@ -37,7 +37,7 @@ export class NotificationService {
         }
       });
     } catch (error) {
-      promptAction.showToast({ message: title });
+      PromptService.showToast(title);
     }
   }
 
@@ -62,7 +62,7 @@ export class NotificationService {
         }
       });
     } catch (error) {
-      promptAction.showToast({ message: title });
+      PromptService.showToast(title);
     }
   }
 }

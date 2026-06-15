@@ -149,7 +149,11 @@ export class WidgetService {
 
   private static async scheduleNextRefresh(formId: string, data: WidgetCardData): Promise<void> {
     if (data.statusText === '进行中') {
-      await formProvider.setFormNextRefreshTime(formId, 1);
+      try {
+        await formProvider.setFormNextRefreshTime(formId, 1);
+      } catch (error) {
+        // The form host may reject frequent refresh scheduling; keep the card update best-effort.
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
-import promptAction from '@ohos.promptAction';
 import { PomodoroConfig } from '../models/PomodoroConfig';
+import { PromptService } from '../services/PromptService';
 import { ReminderService } from '../services/ReminderService';
 import { StorageService } from '../services/StorageService';
 import { TimerService } from '../services/TimerService';
@@ -170,7 +170,7 @@ export struct SettingsPage {
   }
 
   private async clearAll(): Promise<void> {
-    const result = await promptAction.showDialog({
+    const result = await PromptService.showDialog({
       title: '清除本地数据？',
       message: '任务、记录和当前计时状态都会被清除。',
       buttons: [
@@ -190,7 +190,7 @@ export struct SettingsPage {
       await StorageService.clearAll();
       await this.loadConfig();
       await WidgetService.refreshAllForms();
-      promptAction.showToast({ message: '已清除' });
+      PromptService.showToast('已清除');
     }
   }
 

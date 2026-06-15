@@ -1,7 +1,7 @@
-import promptAction from '@ohos.promptAction';
 import { idleTimerState, TimerState } from '../models/TimerState';
 import { Task } from '../models/Task';
 import { AppStateService } from '../services/AppStateService';
+import { PromptService } from '../services/PromptService';
 import { TaskService } from '../services/TaskService';
 import { TimerService } from '../services/TimerService';
 import { WidgetService } from '../services/WidgetService';
@@ -50,7 +50,7 @@ export struct TaskPage {
   private async addTask(): Promise<void> {
     const task = await TaskService.add(this.draftTitle, this.draftEstimate);
     if (!task) {
-      promptAction.showToast({ message: '先写一个任务名称' });
+      PromptService.showToast('先写一个任务名称');
       return;
     }
 
@@ -64,14 +64,14 @@ export struct TaskPage {
   private async startTask(task: Task): Promise<void> {
     if (this.isTaskInCurrentTimer(task)) {
       AppStateService.setSelectedTabIndex(0);
-      promptAction.showToast({ message: '已切到当前专注' });
+      PromptService.showToast('已切到当前专注');
       return;
     }
 
     const result = await TimerService.tryStartFocus(undefined, task.id, task.title);
     this.timerState = result.state;
     AppStateService.setSelectedTabIndex(0);
-    promptAction.showToast({ message: result.didStart ? '已开始专注' : result.message });
+    PromptService.showToast(result.didStart ? '已开始专注' : result.message);
     await WidgetService.refreshAllForms();
   }
 
@@ -82,7 +82,7 @@ export struct TaskPage {
   }
 
   private async deleteTask(task: Task): Promise<void> {
-    const result = await promptAction.showDialog({
+    const result = await PromptService.showDialog({
       title: '删除任务？',
       message: task.title,
       buttons: [

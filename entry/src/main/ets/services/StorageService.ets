@@ -95,7 +95,11 @@ export class StorageService {
       return;
     }
 
-    StorageService.preferences = await dataPreferences.getPreferences(context, PREFERENCES_NAME);
+    try {
+      StorageService.preferences = await dataPreferences.getPreferences(context, PREFERENCES_NAME);
+    } catch (error) {
+      throw new Error('StorageService failed to initialize preferences.');
+    }
   }
 
   private static getPreferences(): dataPreferences.Preferences {
@@ -108,7 +112,13 @@ export class StorageService {
 
   private static readJson<T>(key: string, fallback: T): T {
     const preferences = StorageService.getPreferences();
-    const rawValue = preferences.getSync(key, '') as string;
+    let rawValue = '';
+
+    try {
+      rawValue = preferences.getSync(key, '') as string;
+    } catch (error) {
+      return fallback;
+    }
 
     if (!rawValue) {
       return fallback;
@@ -123,8 +133,12 @@ export class StorageService {
 
   private static async writeJson<T>(key: string, value: T): Promise<void> {
     const preferences = StorageService.getPreferences();
-    preferences.putSync(key, JSON.stringify(value));
-    await preferences.flush();
+    try {
+      preferences.putSync(key, JSON.stringify(value));
+      await preferences.flush();
+    } catch (error) {
+      // Persisting user state should fail softly; callers can continue using in-memory state.
+    }
   }
 
   static async getConfig(): Promise<PomodoroConfig> {
@@ -208,8 +222,12 @@ export class StorageService {
   static async clearAll(): Promise<void> {
     const preferences = StorageService.getPreferences();
     const widgetFormIds = await StorageService.getWidgetFormIds();
-    preferences.clearSync();
-    await preferences.flush();
+    try {
+      preferences.clearSync();
+      await preferences.flush();
+    } catch (error) {
+      // Keep the app usable even if the preference backend is temporarily unavailable.
+    }
     await StorageService.saveWidgetFormIds(widgetFormIds);
   }
 }

@@ -1,4 +1,3 @@
-import promptAction from '@ohos.promptAction';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SessionPreviewList } from '../components/SessionPreviewList';
 import { TimerDisplay } from '../components/TimerDisplay';
@@ -10,6 +9,7 @@ import { TaskService } from '../services/TaskService';
 import { TimerService } from '../services/TimerService';
 import { GoalStats, StatsService, TodayStats } from '../services/StatsService';
 import { PomodoroProgressService } from '../services/PomodoroProgressService';
+import { PromptService } from '../services/PromptService';
 import { WidgetService } from '../services/WidgetService';
 import { formatDuration } from '../utils/dateTime';
 
@@ -75,7 +75,7 @@ export struct FocusPage {
     const result = await TimerService.tryStartFocus(undefined, task?.id, task?.title || '自由专注');
     this.timerState = result.state;
     if (!result.didStart) {
-      promptAction.showToast({ message: result.message });
+      PromptService.showToast(result.message);
     }
 
     this.remainingSeconds = await TimerService.getRemainingSeconds();
@@ -88,7 +88,7 @@ export struct FocusPage {
     const result = await TimerService.tryStartFocus(10, task?.id, task?.title || '自由专注');
     this.timerState = result.state;
     if (!result.didStart) {
-      promptAction.showToast({ message: result.message });
+      PromptService.showToast(result.message);
     }
 
     this.remainingSeconds = await TimerService.getRemainingSeconds();
@@ -100,7 +100,7 @@ export struct FocusPage {
     const result = await TimerService.tryStartBreak();
     this.timerState = result.state;
     if (!result.didStart) {
-      promptAction.showToast({ message: result.message });
+      PromptService.showToast(result.message);
     }
 
     this.remainingSeconds = await TimerService.getRemainingSeconds();
@@ -127,7 +127,7 @@ export struct FocusPage {
     const message = this.timerState.mode === 'break'
       ? '会回到空闲状态。'
       : '这段时间会记录为已结束，不计入今日专注总时长。';
-    const result = await promptAction.showDialog({
+    const result = await PromptService.showDialog({
       title,
       message,
       buttons: [
