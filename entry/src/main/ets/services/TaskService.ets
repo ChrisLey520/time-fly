@@ -66,6 +66,32 @@ export class TaskService {
     return task;
   }
 
+  static async restore(taskId: string): Promise<Task | null> {
+    const tasks = await StorageService.getTasks();
+    const task = tasks.find((item: Task) => item.id === taskId);
+    if (!task) {
+      return null;
+    }
+
+    task.status = 'active';
+    await StorageService.saveTasks(tasks);
+
+    return task;
+  }
+
+  static async archive(taskId: string): Promise<Task | null> {
+    const tasks = await StorageService.getTasks();
+    const task = tasks.find((item: Task) => item.id === taskId);
+    if (!task) {
+      return null;
+    }
+
+    task.status = 'archived';
+    await StorageService.saveTasks(tasks);
+
+    return task;
+  }
+
   static async incrementCompletedFocusCount(taskId?: string): Promise<Task | null> {
     if (!taskId) {
       return null;
