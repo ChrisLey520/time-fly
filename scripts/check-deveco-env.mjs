@@ -8,6 +8,8 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDir, '..');
 const args = process.argv.slice(2);
 const assemble = args.includes('--assemble');
+const checkDevice = args.includes('--device') || args.includes('--install');
+const install = args.includes('--install');
 const printEnv = args.includes('--print-env');
 const separatorIndex = args.indexOf('--');
 const hvigorArgs = separatorIndex >= 0
@@ -51,6 +53,33 @@ function readJson(filePath) {
 function extractStringField(text, field) {
   const match = new RegExp(`"${field}"\\s*:\\s*"([^"]+)"`).exec(text);
   return match ? match[1] : '';
+}
+
+function extractArrayBlock(text, field) {
+  const fieldIndex = text.indexOf(`"${field}"`);
+  if (fieldIndex < 0) {
+    return '';
+  }
+
+  const startIndex = text.indexOf('[', fieldIndex);
+  if (startIndex < 0) {
+    return '';
+  }
+
+  let depth = 0;
+  for (let index = startIndex; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '[') {
+      depth += 1;
+    } else if (char === ']') {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(startIndex, index + 1);
+      }
+    }
+  }
+
+  return '';
 }
 
 function extractApiNumber(sdkVersion) {
@@ -115,7 +144,7 @@ function checkProjectProfile() {
   const profilePath = path.join(projectRoot, 'build-profile.json5');
   if (!exists(profilePath)) {
     fail('build-profile.json5', 'missing');
-    return { compileSdkVersion: '', compileApi: '', runtimeOS: '' };
+    return { compileSdkVersion: '', compileApi: '', runtimeOS: '', signingConfig: '', signingConfigCount: 0 };
   }
 
   const text = readText(profilePath);
@@ -123,6 +152,9 @@ function checkProjectProfile() {
   const targetSdkVersion = extractStringField(text, 'targetSdkVersion');
   const compatibleSdkVersion = extractStringField(text, 'compatibleSdkVersion');
   const runtimeOS = extractStringField(text, 'runtimeOS');
+  const signingConfig = extractStringField(text, 'signingConfig');
+  const signingConfigsBlock = extractArrayBlock(text, 'signingConfigs');
+  const signingConfigCount = (signingConfigsBlock.match(/"material"\s*:/g) || []).length;
   const compileApi = extractApiNumber(compileSdkVersion);
 
   if (compileSdkVersion) {
@@ -147,7 +179,15 @@ function checkProjectProfile() {
     fail('runtimeOS', `expected HarmonyOS, found "${runtimeOS || 'missing'}"`);
   }
 
-  return { compileSdkVersion, compileApi, runtimeOS };
+  if (signingConfigCount > 0) {
+    mark('pass', 'signingConfigs', `${signingConfigCount} configured`);
+  } else if (signingConfig) {
+    mark('warn', 'signingConfigs', `product references "${signingConfig}", but app.signingConfigs is empty`);
+  } else {
+    mark('warn', 'signingConfigs', 'empty; HAP will be unsigned');
+  }
+
+  return { compileSdkVersion, compileApi, runtimeOS, signingConfig, signingConfigCount };
 }
 
 function checkSdkHome(sdkRoot, envHome) {
@@ -162,15 +202,15 @@ function checkSdkHome(sdkRoot, envHome) {
   }
 
   if (hasDefaultOnlyLayout(envHome) && normalize(path.dirname(envHome)) === normalize(sdkRoot)) {
-    fail(
+    mark(
+      'warn',
       'DEVECO_SDK_HOME',
-      `points to sdk/default; Hvigor needs the parent SDK root: ${sdkRoot}`,
-      false,
+      `points to sdk/default; Hvigor subprocesses will use the parent SDK root: ${sdkRoot}`,
     );
     return;
   }
 
-  fail('DEVECO_SDK_HOME', `unexpected value "${envHome}"; suggested value is ${sdkRoot}`, false);
+  mark('warn', 'DEVECO_SDK_HOME', `unexpected value "${envHome}"; suggested value is ${sdkRoot}`);
 }
 
 function checkComponentPackage(packagePath, expectedApi, componentLabel) {
@@ -287,6 +327,95 @@ function checkHvigor(sdkRoot) {
   return hvigorw;
 }
 
+function detectHdc(sdkRoot) {
+  const hdcPath = path.join(sdkDefaultDir(sdkRoot), 'openharmony', 'toolchains', 'hdc');
+  if (exists(hdcPath)) {
+    mark('pass', 'hdc', hdcPath);
+    return hdcPath;
+  }
+
+  mark('warn', 'hdc', `missing ${hdcPath}`);
+  return '';
+}
+
+function checkDevices(hdcPath) {
+  if (!hdcPath) {
+    return [];
+  }
+
+  const result = spawnSync(hdcPath, ['list', 'targets'], { encoding: 'utf8' });
+  if (result.status !== 0) {
+    mark('warn', 'devices', `${result.stderr || result.stdout || 'hdc list targets failed'}`.trim());
+    return [];
+  }
+
+  const devices = result.stdout.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.includes('[Empty]'));
+
+  if (devices.length > 0) {
+    mark('pass', 'devices', devices.join(', '));
+  } else {
+    mark('warn', 'devices', 'no hdc target connected');
+  }
+
+  return devices;
+}
+
+function findHapOutputs() {
+  const outputsDir = path.join(projectRoot, 'entry', 'build', 'default', 'outputs');
+  if (!exists(outputsDir)) {
+    return [];
+  }
+
+  const found = [];
+  const stack = [outputsDir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) {
+      continue;
+    }
+
+    const entries = fs.readdirSync(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(entryPath);
+      } else if (entry.name.endsWith('.hap')) {
+        found.push(entryPath);
+      }
+    }
+  }
+
+  return found.sort();
+}
+
+function reportHapOutputs(projectProfile) {
+  const haps = findHapOutputs();
+  if (haps.length === 0) {
+    mark('warn', 'HAP output', 'not found under entry/build/default/outputs');
+    return '';
+  }
+
+  let installableHap = '';
+  for (const hap of haps) {
+    const relativePath = path.relative(projectRoot, hap);
+    const sizeKb = Math.ceil(fs.statSync(hap).size / 1024);
+    if (hap.includes('-unsigned')) {
+      mark('warn', 'HAP output', `${relativePath} (${sizeKb} KB, unsigned)`);
+    } else {
+      mark('pass', 'HAP output', `${relativePath} (${sizeKb} KB)`);
+      installableHap = hap;
+    }
+  }
+
+  if (!installableHap && projectProfile.signingConfigCount === 0) {
+    mark('warn', 'install readiness', 'unsigned HAP cannot be installed on a normal device; configure signing in DevEco Studio');
+  }
+
+  return installableHap;
+}
+
 function printSuggestedEnvironment(sdkRoot, javaInfo) {
   console.log('');
   console.log('Suggested shell setup:');
@@ -317,6 +446,23 @@ function runHvigor(hvigorw, sdkRoot, javaInfo) {
     stdio: 'inherit',
   });
 
+  return result.status ?? 1;
+}
+
+function runInstall(hdcPath, devices, hapPath) {
+  if (!hdcPath || devices.length === 0 || !hapPath) {
+    console.log('');
+    console.error('Cannot install until hdc has a device and a signed HAP is available.');
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log('');
+  console.log(`Running: ${hdcPath} install -r ${hapPath}`);
+  const result = spawnSync(hdcPath, ['install', '-r', hapPath], {
+    cwd: projectRoot,
+    stdio: 'inherit',
+  });
   process.exitCode = result.status ?? 1;
 }
 
@@ -331,6 +477,8 @@ checkSdkComponents(sdkRoot, projectProfile.compileApi);
 const javaInfo = checkJava(sdkRoot);
 const javaReady = Boolean(javaInfo.command);
 const hvigorw = checkHvigor(sdkRoot);
+const hdcPath = checkDevice || install ? detectHdc(sdkRoot) : '';
+const devices = checkDevice || install ? checkDevices(hdcPath) : [];
 
 if (printEnv || hasFailure) {
   printSuggestedEnvironment(sdkRoot, javaInfo);
@@ -342,7 +490,19 @@ if (assemble) {
     console.error('Cannot run Hvigor until the failed checks above are fixed.');
     process.exit(1);
   }
-  runHvigor(hvigorw, sdkRoot, javaInfo);
+  const hvigorStatus = runHvigor(hvigorw, sdkRoot, javaInfo);
+  process.exitCode = hvigorStatus;
+  if (hvigorStatus === 0) {
+    console.log('');
+    console.log('Build artifacts:');
+    const hapPath = reportHapOutputs(projectProfile);
+    if (install) {
+      runInstall(hdcPath, devices, hapPath);
+    }
+  }
+} else if (install) {
+  const hapPath = reportHapOutputs(projectProfile);
+  runInstall(hdcPath, devices, hapPath);
 } else if (hasFailure || !javaReady) {
   process.exitCode = 1;
 }

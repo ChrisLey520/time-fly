@@ -1,10 +1,32 @@
 import notificationManager from '@ohos.notificationManager';
-import notification from '@ohos.notification';
 import common from '@ohos.app.ability.common';
 import { PromptService } from './PromptService';
 import { StorageService } from './StorageService';
 
+interface NotificationTextPayload {
+  title: string;
+  text: string;
+}
+
 export class NotificationService {
+  private static notificationId(): number {
+    return Date.now() % 100000;
+  }
+
+  private static createTextRequest(payload: NotificationTextPayload): notificationManager.NotificationRequest {
+    return {
+      id: NotificationService.notificationId(),
+      notificationSlotType: notificationManager.SlotType.SOCIAL_COMMUNICATION,
+      content: {
+        notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
+        normal: {
+          title: payload.title,
+          text: payload.text
+        }
+      }
+    };
+  }
+
   static async requestEnable(context: common.UIAbilityContext): Promise<void> {
     try {
       const enabled = await notificationManager.isNotificationEnabled();
@@ -26,16 +48,7 @@ export class NotificationService {
     const text = `${durationMinutes} 分钟被好好安放了`;
 
     try {
-      await notificationManager.publish({
-        id: Date.now() % 100000,
-        content: {
-          contentType: notification.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
-          normal: {
-            title,
-            text
-          }
-        }
-      });
+      await notificationManager.publish(NotificationService.createTextRequest({ title, text }));
     } catch (error) {
       PromptService.showToast(title);
     }
@@ -51,16 +64,7 @@ export class NotificationService {
     const text = '歇息结束，继续你的节奏';
 
     try {
-      await notificationManager.publish({
-        id: Date.now() % 100000,
-        content: {
-          contentType: notification.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
-          normal: {
-            title,
-            text
-          }
-        }
-      });
+      await notificationManager.publish(NotificationService.createTextRequest({ title, text }));
     } catch (error) {
       PromptService.showToast(title);
     }

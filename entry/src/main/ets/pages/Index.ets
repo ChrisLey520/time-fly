@@ -3,6 +3,7 @@ import { RecordPage } from './RecordPage';
 import { SettingsPage } from './SettingsPage';
 import { TaskPage } from './TaskPage';
 import { AppStateService } from '../services/AppStateService';
+import { PromptService } from '../services/PromptService';
 
 @Entry
 @Component
@@ -12,6 +13,7 @@ struct Index {
   private ticker: number = -1;
 
   aboutToAppear(): void {
+    PromptService.bindContext(this.getUIContext());
     this.startTicker();
   }
 
