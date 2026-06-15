@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "栖时"
+    },
+    {
+      "name": "module_desc",
+      "value": "Qishi focus timer"
+    },
+    {
+      "name": "entryability_desc",
+      "value": "Qishi entry ability"
+    }
+  ]
+}

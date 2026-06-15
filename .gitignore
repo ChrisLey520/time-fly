@@ -1,0 +1,10 @@
+.hvigor/
+.idea/
+build/
+entry/build/
+oh_modules/
+entry/oh_modules/
+*.hap
+*.app
+*.hqf
+.DS_Store
