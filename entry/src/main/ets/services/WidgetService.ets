@@ -30,10 +30,10 @@ export interface WidgetCardData {
 
 export class WidgetService {
   static async getSnapshot(): Promise<WidgetSnapshot> {
-    const stats = await StatsService.getTodayStats();
-    const goalStats = await StatsService.getGoalStats();
     const state: TimerState = await TimerService.restore();
     const remainingSeconds = await TimerService.getRemainingSeconds();
+    const stats = await StatsService.getTodayStats();
+    const goalStats = await StatsService.getGoalStats();
 
     return {
       todayFocusSeconds: stats.focusSeconds,
