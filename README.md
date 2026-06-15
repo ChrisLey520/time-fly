@@ -50,15 +50,29 @@ docs/
   assets/           图标源文件
 scripts/
   check-deveco-env.mjs DevEco/Hvigor 环境预检
+  verify.mjs            本地测试与可选 DevEco 构建验证
 ```
 
 ## 本地验证
 
-核心计时逻辑可用 Node 验证：
+日常本地验证：
+
+```bash
+node scripts/verify.mjs
+```
+
+完整验证本地测试、DevEco 构建和设备可见性：
+
+```bash
+node scripts/verify.mjs --full
+```
+
+也可以单独运行核心逻辑测试：
 
 ```bash
 node test/timer_core.test.mjs
 node test/stats_core.test.mjs
+node test/task_core.test.mjs
 ```
 
 DevEco/Hvigor 环境可用预检脚本验证：
