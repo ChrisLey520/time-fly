@@ -13,6 +13,7 @@ interface StorageKeys {
   sessions: string;
   tasks: string;
   progress: string;
+  widgetFormIds: string;
 }
 
 const STORAGE_KEYS: StorageKeys = {
@@ -20,21 +21,36 @@ const STORAGE_KEYS: StorageKeys = {
   timerState: 'qishi.timerState',
   sessions: 'qishi.sessions',
   tasks: 'qishi.tasks',
-  progress: 'qishi.progress'
+  progress: 'qishi.progress',
+  widgetFormIds: 'qishi.widgetFormIds'
 };
 
 export interface PomodoroProgress {
   completedFocusRounds: number;
 }
 
+export interface WidgetFormIds {
+  ids: string[];
+}
+
 const defaultPomodoroProgress: PomodoroProgress = {
   completedFocusRounds: 0
 };
 
+const defaultWidgetFormIds: WidgetFormIds = {
+  ids: []
+};
+
+function cloneWidgetFormIds(formIds: WidgetFormIds): WidgetFormIds {
+  return {
+    ids: formIds.ids.slice()
+  };
+}
+
 export class StorageService {
   private static preferences?: dataPreferences.Preferences;
 
-  static async init(context: common.UIAbilityContext): Promise<void> {
+  static async init(context: common.Context): Promise<void> {
     if (StorageService.preferences) {
       return;
     }
@@ -121,9 +137,20 @@ export class StorageService {
     await StorageService.writeJson<PomodoroProgress>(STORAGE_KEYS.progress, progress);
   }
 
+  static async getWidgetFormIds(): Promise<WidgetFormIds> {
+    const formIds = StorageService.readJson<WidgetFormIds>(STORAGE_KEYS.widgetFormIds, defaultWidgetFormIds);
+    return cloneWidgetFormIds(formIds);
+  }
+
+  static async saveWidgetFormIds(formIds: WidgetFormIds): Promise<void> {
+    await StorageService.writeJson<WidgetFormIds>(STORAGE_KEYS.widgetFormIds, cloneWidgetFormIds(formIds));
+  }
+
   static async clearAll(): Promise<void> {
     const preferences = StorageService.getPreferences();
+    const widgetFormIds = await StorageService.getWidgetFormIds();
     preferences.clearSync();
     await preferences.flush();
+    await StorageService.saveWidgetFormIds(widgetFormIds);
   }
 }

@@ -11,6 +11,18 @@
     {
       "name": "entryability_desc",
       "value": "Qishi entry ability"
+    },
+    {
+      "name": "entry_form_ability_desc",
+      "value": "Qishi widget provider"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "栖时"
+    },
+    {
+      "name": "widget_desc",
+      "value": "查看当前专注和今日时长"
     }
   ]
 }

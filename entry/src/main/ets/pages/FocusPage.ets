@@ -10,6 +10,7 @@ import { TaskService } from '../services/TaskService';
 import { TimerService } from '../services/TimerService';
 import { StatsService, TodayStats } from '../services/StatsService';
 import { PomodoroProgressService } from '../services/PomodoroProgressService';
+import { WidgetService } from '../services/WidgetService';
 
 @Component
 export struct FocusPage {
@@ -25,6 +26,7 @@ export struct FocusPage {
   };
   @State completedFocusRounds: number = 0;
   private ticker: number = -1;
+  private widgetSnapshotKey: string = '';
 
   aboutToAppear(): void {
     this.restoreTimer();
@@ -42,6 +44,7 @@ export struct FocusPage {
     this.activeTasks = await TaskService.listActive();
     this.todayStats = await StatsService.getTodayStats();
     this.completedFocusRounds = await PomodoroProgressService.getCompletedFocusRounds();
+    await this.refreshWidgetIfChanged();
   }
 
   private startTicker(): void {
@@ -68,6 +71,7 @@ export struct FocusPage {
 
     this.remainingSeconds = await TimerService.getRemainingSeconds();
     await this.restoreTimer();
+    await WidgetService.refreshAllForms();
   }
 
   private async onStartQuickTest(): Promise<void> {
@@ -80,6 +84,7 @@ export struct FocusPage {
 
     this.remainingSeconds = await TimerService.getRemainingSeconds();
     await this.restoreTimer();
+    await WidgetService.refreshAllForms();
   }
 
   private async onStartBreak(): Promise<void> {
@@ -91,18 +96,21 @@ export struct FocusPage {
 
     this.remainingSeconds = await TimerService.getRemainingSeconds();
     await this.restoreTimer();
+    await WidgetService.refreshAllForms();
   }
 
   private async onPause(): Promise<void> {
     this.timerState = await TimerService.pause();
     this.remainingSeconds = await TimerService.getRemainingSeconds();
     await this.restoreTimer();
+    await WidgetService.refreshAllForms();
   }
 
   private async onResume(): Promise<void> {
     this.timerState = await TimerService.resume();
     this.remainingSeconds = await TimerService.getRemainingSeconds();
     await this.restoreTimer();
+    await WidgetService.refreshAllForms();
   }
 
   private async onAbandon(): Promise<void> {
@@ -128,6 +136,7 @@ export struct FocusPage {
     if (result.index === 1) {
       await TimerService.abandon();
       await this.restoreTimer();
+      await WidgetService.refreshAllForms();
     }
   }
 
@@ -184,6 +193,14 @@ export struct FocusPage {
     }
 
     return `${minutes} 分 ${seconds} 秒`;
+  }
+
+  private async refreshWidgetIfChanged(): Promise<void> {
+    const nextKey = `${this.timerState.mode}:${this.timerState.status}:${this.timerState.taskId ? this.timerState.taskId : ''}:${this.timerState.expectedEndAt ? this.timerState.expectedEndAt : 0}:${this.timerState.durationSeconds}:${this.todayStats.completedFocusCount}`;
+    if (this.widgetSnapshotKey !== nextKey) {
+      this.widgetSnapshotKey = nextKey;
+      await WidgetService.refreshAllForms();
+    }
   }
 
   build() {
@@ -322,7 +339,9 @@ export struct FocusPage {
                 .borderRadius(16)
                 .onClick(() => {
                   TimerService.clearTimer().then(() => {
-                    this.restoreTimer();
+                    this.restoreTimer().then(() => {
+                      WidgetService.refreshAllForms();
+                    });
                   });
                 });
             }

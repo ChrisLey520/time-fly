@@ -1,6 +1,7 @@
 import promptAction from '@ohos.promptAction';
 import { PomodoroConfig } from '../models/PomodoroConfig';
 import { StorageService } from '../services/StorageService';
+import { WidgetService } from '../services/WidgetService';
 
 @Component
 export struct SettingsPage {
@@ -25,6 +26,7 @@ export struct SettingsPage {
   private async saveConfig(config: PomodoroConfig): Promise<void> {
     this.config = config;
     await StorageService.saveConfig(config);
+    await WidgetService.refreshAllForms();
   }
 
   private createConfig(
@@ -154,6 +156,7 @@ export struct SettingsPage {
     if (result.index === 1) {
       await StorageService.clearAll();
       await this.loadConfig();
+      await WidgetService.refreshAllForms();
       promptAction.showToast({ message: '已清除' });
     }
   }

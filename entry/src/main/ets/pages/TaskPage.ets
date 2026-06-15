@@ -4,6 +4,7 @@ import { Task } from '../models/Task';
 import { AppStateService } from '../services/AppStateService';
 import { TaskService } from '../services/TaskService';
 import { TimerService } from '../services/TimerService';
+import { WidgetService } from '../services/WidgetService';
 
 @Component
 export struct TaskPage {
@@ -57,6 +58,7 @@ export struct TaskPage {
     this.draftEstimate = 2;
     this.showCreateForm = false;
     await this.loadTasks();
+    await WidgetService.refreshAllForms();
   }
 
   private async startTask(task: Task): Promise<void> {
@@ -70,11 +72,13 @@ export struct TaskPage {
     this.timerState = result.state;
     AppStateService.setSelectedTabIndex(0);
     promptAction.showToast({ message: result.didStart ? '已开始专注' : result.message });
+    await WidgetService.refreshAllForms();
   }
 
   private async completeTask(task: Task): Promise<void> {
     await TaskService.markCompleted(task.id);
     await this.refresh();
+    await WidgetService.refreshAllForms();
   }
 
   private async deleteTask(task: Task): Promise<void> {
@@ -96,6 +100,7 @@ export struct TaskPage {
     if (result.index === 1) {
       await TaskService.delete(task.id);
       await this.refresh();
+      await WidgetService.refreshAllForms();
     }
   }
 

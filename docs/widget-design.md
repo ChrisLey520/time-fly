@@ -6,16 +6,17 @@
 
 ```text
 栖时
-今日已专注 1小时20分
-开始专注
+准备专注
+今日 0 分钟
+自由专注
 ```
 
 ## 专注中
 
 ```text
 栖时
-专注中
-剩余 18:32
+正在专注
+18:32
 阅读产品文档
 ```
 
@@ -33,6 +34,8 @@ interface WidgetSnapshot {
 }
 ```
 
-## 接入时机
+## 当前接入
 
-等 DevEco Studio 补齐 HarmonyOS SDK 后，再新增 FormExtensionAbility 和卡片资源。先验证主 App 的计时与通知，避免同时踩两个平台能力坑。
+当前已新增 `EntryFormAbility`、`form_config.json` 和 `WidgetCard.ets`，卡片使用 2*2 规格。主 App 的开始、暂停、继续、结束、任务变更和清除数据会触发卡片刷新；运行中卡片会请求 1 分钟后的下一次系统刷新。
+
+命令行构建目前仍被本机 `SDK component missing` 阻断，需在 DevEco Studio 补齐 SDK 后做真机/模拟器验证。

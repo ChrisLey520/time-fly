@@ -21,6 +21,7 @@
 - 主动结束生成 `abandoned` 记录
 - 记录页展示今日 completed 专注时长、完成次数、任务数、计划时长和历史记录
 - 设置页支持调整专注/歇息时长、提醒开关和清除本地数据
+- 已接入 2*2 服务卡片骨架，展示当前状态、剩余时间、任务和今日时长
 - 通知服务已接入完成链路，真机行为需等 SDK 补齐后验证
 
 ## 工程结构
@@ -29,9 +30,11 @@
 entry/src/main/ets/
   components/       基础 UI 组件
   entryability/     应用入口
+  entryformability/ 服务卡片入口
   models/           数据模型
   pages/            页面
   services/         Storage / Timer / Session 服务
+  widget/           服务卡片页面
   utils/            时间格式化、ID
 docs/
   widget-design.md  服务卡片设计与快照接口
@@ -52,4 +55,4 @@ node test/timer_core.test.mjs
 
 1. 在 DevEco Studio 中补齐 HarmonyOS SDK 后构建真机包。
 2. 修正可能的 ArkTS 编译细节。
-3. 进入下一轮：FormExtension 服务卡片、通知延迟调度和更完整的视觉打磨。
+3. 进入下一轮：通知延迟调度、卡片真机验证和更完整的视觉打磨。
