@@ -144,6 +144,75 @@ export struct TaskPage {
     return '#5F9E8A';
   }
 
+  private taskProgressPercent(task: Task): number {
+    if (task.estimatedFocusCount <= 0) {
+      return 100;
+    }
+
+    return Math.min(100, Math.floor(task.completedFocusCount * 100 / task.estimatedFocusCount));
+  }
+
+  private taskProgressWidth(task: Task): string {
+    return `${this.taskProgressPercent(task)}%`;
+  }
+
+  private taskProgressColor(task: Task): string {
+    if (task.status === 'completed') {
+      return '#7B8785';
+    }
+
+    if (this.taskProgressPercent(task) >= 100) {
+      return '#4D7EA8';
+    }
+
+    return '#5F9E8A';
+  }
+
+  private taskStatusText(task: Task): string {
+    if (task.status === 'completed') {
+      return '已完成';
+    }
+
+    if (this.isTaskInCurrentTimer(task)) {
+      return '专注中';
+    }
+
+    if (this.taskProgressPercent(task) >= 100) {
+      return '目标达成';
+    }
+
+    return '进行中';
+  }
+
+  private taskStatusColor(task: Task): string {
+    if (task.status === 'completed') {
+      return '#7B8785';
+    }
+
+    if (this.isTaskInCurrentTimer(task)) {
+      return '#4D7EA8';
+    }
+
+    if (this.taskProgressPercent(task) >= 100) {
+      return '#4D7EA8';
+    }
+
+    return '#5F9E8A';
+  }
+
+  private taskRemainingText(task: Task): string {
+    if (task.status === 'completed') {
+      return '任务已完成';
+    }
+
+    const remainingCount = Math.max(0, task.estimatedFocusCount - task.completedFocusCount);
+    if (remainingCount === 0) {
+      return '已达到预计专注次数';
+    }
+
+    return `还差 ${remainingCount} 次`;
+  }
+
   build() {
     Scroll() {
       Column({ space: 18 }) {
@@ -308,9 +377,40 @@ export struct TaskPage {
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1);
 
-                Text(task.status === 'completed' ? '已完成' : '进行中')
+                Text(this.taskStatusText(task))
                   .fontSize(13)
-                  .fontColor(task.status === 'completed' ? '#7B8785' : '#5F9E8A');
+                  .fontColor(this.taskStatusColor(task));
+              }
+              .width('100%');
+
+              Column({ space: 7 }) {
+                Row() {
+                  Text(`${this.taskProgressPercent(task)}%`)
+                    .fontSize(12)
+                    .fontColor(this.taskProgressColor(task))
+                    .layoutWeight(1);
+
+                  Text(this.taskRemainingText(task))
+                    .fontSize(12)
+                    .fontColor('#7B8785');
+                }
+                .width('100%');
+
+                Stack({ alignContent: Alignment.Start }) {
+                  Row()
+                    .width('100%')
+                    .height(8)
+                    .backgroundColor('#EEF3F2')
+                    .borderRadius(4);
+
+                  Row()
+                    .width(this.taskProgressWidth(task))
+                    .height(8)
+                    .backgroundColor(this.taskProgressColor(task))
+                    .borderRadius(4);
+                }
+                .width('100%')
+                .height(8);
               }
               .width('100%');
 
