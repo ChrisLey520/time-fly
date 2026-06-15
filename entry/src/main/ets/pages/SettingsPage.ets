@@ -1,4 +1,4 @@
-import { PomodoroConfig } from '../models/PomodoroConfig';
+import { defaultPomodoroConfig, PomodoroConfig } from '../models/PomodoroConfig';
 import { PromptService } from '../services/PromptService';
 import { ReminderService } from '../services/ReminderService';
 import { StorageService } from '../services/StorageService';
@@ -167,6 +167,29 @@ export struct SettingsPage {
       this.config.vibrationEnabled,
       isOn
     ));
+  }
+
+  private async resetRhythm(): Promise<void> {
+    const result = await PromptService.showDialog({
+      title: '恢复默认节奏？',
+      message: '专注、歇息和每日目标会恢复为栖时默认值，任务和记录会保留。',
+      buttons: [
+        {
+          text: '取消',
+          color: '#5F9E8A'
+        },
+        {
+          text: '恢复',
+          color: '#4D7EA8'
+        }
+      ]
+    });
+
+    if (result.index === 1) {
+      await this.saveConfig(defaultPomodoroConfig);
+      await ReminderService.syncWithTimer(await TimerService.restore());
+      PromptService.showToast('已恢复默认节奏');
+    }
   }
 
   private async clearAll(): Promise<void> {
@@ -438,6 +461,21 @@ export struct SettingsPage {
           width: 1,
           color: '#DDE8EA'
         });
+
+        Button('恢复默认节奏')
+          .height(48)
+          .width('100%')
+          .fontSize(15)
+          .fontColor('#4D7EA8')
+          .backgroundColor('#FFFFFF')
+          .borderRadius(16)
+          .border({
+            width: 1,
+            color: '#DDE8EA'
+          })
+          .onClick(() => {
+            this.resetRhythm();
+          });
 
         Button('清除本地数据')
           .height(50)

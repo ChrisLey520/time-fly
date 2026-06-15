@@ -67,6 +67,32 @@ export DEVECO_SDK_HOME=/Applications/DevEco-Studio.app/Contents/sdk
 node scripts/check-deveco-env.mjs --assemble
 ```
 
+## `hvigor-config.json5` Schema validate failed
+
+Hvigor 报错：
+
+```text
+00303038 Configuration Error
+Schema validate failed, at file: hvigor/hvigor-config.json5
+```
+
+先运行：
+
+```bash
+node scripts/check-deveco-env.mjs
+```
+
+当前仓库的 `hvigor/hvigor-config.json5` 应保持为：
+
+```json
+{
+  "modelVersion": "6.0.0",
+  "dependencies": {}
+}
+```
+
+常见错误是把 `dependencies` 改成数组、写入旧版本模板字段，或把 `modelVersion` 改成与当前 DevEco/Hvigor 不匹配的值。修回后重新执行 DevEco `Sync`。
+
 ## Java Runtime
 
 预检脚本会优先使用 DevEco Studio 自带 JBR：
@@ -152,3 +178,15 @@ node scripts/check-deveco-env.mjs --install
 ```
 
 当只有 `*-unsigned.hap` 时，脚本会阻止直接安装并提示先配置签名。
+
+DevEco Studio 中建议路径：
+
+```text
+File > Project Structure > Signing Configs > Automatically generate signature
+```
+
+生成签名后再次运行：
+
+```bash
+node scripts/check-deveco-env.mjs --assemble --device --install
+```

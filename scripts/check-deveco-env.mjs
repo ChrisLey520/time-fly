@@ -11,6 +11,7 @@ const assemble = args.includes('--assemble');
 const checkDevice = args.includes('--device') || args.includes('--install');
 const install = args.includes('--install');
 const printEnv = args.includes('--print-env');
+const showHelp = args.includes('--help') || args.includes('-h');
 const separatorIndex = args.indexOf('--');
 const hvigorArgs = separatorIndex >= 0
   ? args.slice(separatorIndex + 1)
@@ -22,6 +23,26 @@ const components = ['toolchains', 'ets', 'js', 'native', 'previewer'];
 const hmsCoreComponents = ['toolchains', 'ets', 'native'];
 let hasFailure = false;
 let hasBlockingFailure = false;
+
+function printUsage() {
+  console.log('Usage: node scripts/check-deveco-env.mjs [options] [-- hvigor args]');
+  console.log('');
+  console.log('Options:');
+  console.log('  --assemble    Run Hvigor after environment checks');
+  console.log('  --device      Check DevEco hdc device visibility');
+  console.log('  --install     Install the signed HAP after build/device checks');
+  console.log('  --print-env   Print suggested DEVECO_SDK_HOME/JAVA_HOME exports');
+  console.log('  --help        Show this help');
+  console.log('');
+  console.log('Examples:');
+  console.log('  node scripts/check-deveco-env.mjs --assemble --device');
+  console.log('  node scripts/check-deveco-env.mjs --assemble -- assembleHap --no-daemon --stacktrace --debug');
+}
+
+if (showHelp) {
+  printUsage();
+  process.exit(0);
+}
 
 function mark(level, label, detail = '') {
   const prefix = level === 'pass' ? '[pass]' : level === 'warn' ? '[warn]' : '[fail]';
@@ -188,6 +209,34 @@ function checkProjectProfile() {
   }
 
   return { compileSdkVersion, compileApi, runtimeOS, signingConfig, signingConfigCount };
+}
+
+function checkHvigorConfig() {
+  const configPath = path.join(projectRoot, 'hvigor', 'hvigor-config.json5');
+  if (!exists(configPath)) {
+    fail('hvigor-config.json5', `missing ${configPath}`);
+    return;
+  }
+
+  let config;
+  try {
+    config = readJson(configPath);
+  } catch (error) {
+    fail('hvigor-config.json5', 'invalid JSON5-compatible syntax');
+    return;
+  }
+
+  if (config.modelVersion === '6.0.0') {
+    mark('pass', 'hvigor modelVersion', config.modelVersion);
+  } else {
+    fail('hvigor modelVersion', `expected 6.0.0, found "${config.modelVersion || 'missing'}"`, false);
+  }
+
+  if (config.dependencies && !Array.isArray(config.dependencies) && typeof config.dependencies === 'object') {
+    mark('pass', 'hvigor dependencies', 'object');
+  } else {
+    fail('hvigor dependencies', 'expected an object, for example "dependencies": {}');
+  }
 }
 
 function checkSdkHome(sdkRoot, envHome) {
@@ -411,6 +460,7 @@ function reportHapOutputs(projectProfile) {
 
   if (!installableHap && projectProfile.signingConfigCount === 0) {
     mark('warn', 'install readiness', 'unsigned HAP cannot be installed on a normal device; configure signing in DevEco Studio');
+    console.log('       DevEco Studio: File > Project Structure > Signing Configs > Automatically generate signature');
   }
 
   return installableHap;
@@ -471,6 +521,7 @@ console.log(`Project: ${projectRoot}`);
 console.log('');
 
 const projectProfile = checkProjectProfile();
+checkHvigorConfig();
 const { envHome, sdkRoot } = detectSdkRoot();
 checkSdkHome(sdkRoot, envHome);
 checkSdkComponents(sdkRoot, projectProfile.compileApi);
