@@ -9,6 +9,7 @@ import { SessionService } from '../services/SessionService';
 import { TaskService } from '../services/TaskService';
 import { TimerService } from '../services/TimerService';
 import { StatsService, TodayStats } from '../services/StatsService';
+import { PomodoroProgressService } from '../services/PomodoroProgressService';
 
 @Component
 export struct FocusPage {
@@ -22,6 +23,7 @@ export struct FocusPage {
     completedFocusCount: 0,
     completedTaskCount: 0
   };
+  @State completedFocusRounds: number = 0;
   private ticker: number = -1;
 
   aboutToAppear(): void {
@@ -39,6 +41,7 @@ export struct FocusPage {
     this.recentSessions = await SessionService.listRecent(3);
     this.activeTasks = await TaskService.listActive();
     this.todayStats = await StatsService.getTodayStats();
+    this.completedFocusRounds = await PomodoroProgressService.getCompletedFocusRounds();
   }
 
   private startTicker(): void {
@@ -135,7 +138,7 @@ export struct FocusPage {
 
   private selectedTaskTitle(): string {
     if (this.timerState.mode === 'break') {
-      return '歇息';
+      return this.timerState.taskTitle ? this.timerState.taskTitle : '歇息';
     }
 
     if (this.timerState.status !== 'idle') {
@@ -156,6 +159,16 @@ export struct FocusPage {
     });
 
     return options;
+  }
+
+  private breakDescription(): string {
+    const minutes = Math.floor(this.remainingSeconds / 60);
+    const seconds = this.remainingSeconds % 60;
+    if (minutes > 0 && seconds === 0) {
+      return `${minutes} 分钟`;
+    }
+
+    return `${minutes} 分 ${seconds} 秒`;
   }
 
   build() {
@@ -256,6 +269,23 @@ export struct FocusPage {
             }
             .width('100%');
           } else if (this.timerState.status === 'idle' && this.timerState.mode === 'break') {
+            Column({ space: 6 }) {
+              Text('已完成一段专注')
+                .fontSize(17)
+                .fontWeight(FontWeight.Medium)
+                .fontColor('#1F2A2A')
+                .width('100%')
+                .textAlign(TextAlign.Center);
+
+              Text(`第 ${this.completedFocusRounds} 次专注已安放，建议${this.selectedTaskTitle()} ${this.breakDescription()}`)
+                .fontSize(14)
+                .fontColor('#7B8785')
+                .width('100%')
+                .textAlign(TextAlign.Center);
+            }
+              .width('100%')
+              .padding({ bottom: 4 });
+
             Row({ space: 12 }) {
               Button('开始歇息')
                 .height(52)

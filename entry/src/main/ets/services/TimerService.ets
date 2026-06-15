@@ -5,6 +5,7 @@ import { SessionService } from './SessionService';
 import { StorageService } from './StorageService';
 import { TaskService } from './TaskService';
 import { NotificationService } from './NotificationService';
+import { PomodoroProgressService } from './PomodoroProgressService';
 
 function cloneIdleState(): TimerState {
   return {
@@ -138,7 +139,8 @@ export class TimerService {
     await SessionService.add(session);
     await TaskService.incrementCompletedFocusCount(state.taskId);
     await NotificationService.notifyFocusCompleted(Math.round(state.durationSeconds / 60));
-    await TimerService.prepareBreak();
+    const completedRounds = await PomodoroProgressService.incrementFocusRounds();
+    await TimerService.prepareBreak(completedRounds);
     return session;
   }
 
@@ -194,14 +196,17 @@ export class TimerService {
     await StorageService.clearTimerState();
   }
 
-  private static async prepareBreak(): Promise<void> {
+  private static async prepareBreak(completedRounds: number): Promise<void> {
     const config = await StorageService.getConfig();
+    const shouldUseLongBreak = completedRounds % config.roundsBeforeLongBreak === 0;
+    const breakMinutes = shouldUseLongBreak ? config.longBreakMinutes : config.shortBreakMinutes;
+    const breakTitle = shouldUseLongBreak ? '长歇息' : '歇息';
     const state: TimerState = {
       id: '',
       mode: 'break',
       status: 'idle',
-      taskTitle: '歇息',
-      durationSeconds: config.shortBreakMinutes * 60,
+      taskTitle: breakTitle,
+      durationSeconds: breakMinutes * 60,
       accumulatedPausedMs: 0
     };
 

@@ -114,6 +114,9 @@ export struct RecordPage {
                 Text(formatDuration(session.actualDurationSeconds))
                   .fontSize(12)
                   .fontColor('#7B8785');
+                Text(`计划 ${formatDuration(session.plannedDurationSeconds)}`)
+                  .fontSize(11)
+                  .fontColor('#9AA6A3');
               }
               .alignItems(HorizontalAlign.End);
             }

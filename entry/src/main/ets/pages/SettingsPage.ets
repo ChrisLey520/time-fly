@@ -73,6 +73,32 @@ export struct SettingsPage {
     ));
   }
 
+  private async changeLongBreakMinutes(delta: number): Promise<void> {
+    const nextMinutes = Math.min(120, Math.max(1, this.config.longBreakMinutes + delta));
+    await this.saveConfig(this.createConfig(
+      this.config.focusMinutes,
+      this.config.shortBreakMinutes,
+      nextMinutes,
+      this.config.roundsBeforeLongBreak,
+      this.config.notificationEnabled,
+      this.config.vibrationEnabled,
+      this.config.soundEnabled
+    ));
+  }
+
+  private async changeRoundsBeforeLongBreak(delta: number): Promise<void> {
+    const nextRounds = Math.min(12, Math.max(2, this.config.roundsBeforeLongBreak + delta));
+    await this.saveConfig(this.createConfig(
+      this.config.focusMinutes,
+      this.config.shortBreakMinutes,
+      this.config.longBreakMinutes,
+      nextRounds,
+      this.config.notificationEnabled,
+      this.config.vibrationEnabled,
+      this.config.soundEnabled
+    ));
+  }
+
   private async toggleNotification(isOn: boolean): Promise<void> {
     await this.saveConfig(this.createConfig(
       this.config.focusMinutes,
@@ -210,6 +236,72 @@ export struct SettingsPage {
               .borderRadius(18)
               .onClick(() => {
                 this.changeShortBreakMinutes(1);
+              });
+          }
+          .width('100%');
+
+          Row() {
+            Text('长歇息')
+              .fontSize(15)
+              .fontColor('#1F2A2A')
+              .layoutWeight(1);
+            Button('-')
+              .width(36)
+              .height(36)
+              .fontSize(20)
+              .fontColor('#1F2A2A')
+              .backgroundColor('#DDE8EA')
+              .borderRadius(18)
+              .onClick(() => {
+                this.changeLongBreakMinutes(-5);
+              });
+            Text(`${this.config.longBreakMinutes} 分钟`)
+              .fontSize(15)
+              .fontColor('#1F2A2A')
+              .width(86)
+              .textAlign(TextAlign.Center);
+            Button('+')
+              .width(36)
+              .height(36)
+              .fontSize(20)
+              .fontColor('#FFFFFF')
+              .backgroundColor('#5F9E8A')
+              .borderRadius(18)
+              .onClick(() => {
+                this.changeLongBreakMinutes(5);
+              });
+          }
+          .width('100%');
+
+          Row() {
+            Text('长歇息间隔')
+              .fontSize(15)
+              .fontColor('#1F2A2A')
+              .layoutWeight(1);
+            Button('-')
+              .width(36)
+              .height(36)
+              .fontSize(20)
+              .fontColor('#1F2A2A')
+              .backgroundColor('#DDE8EA')
+              .borderRadius(18)
+              .onClick(() => {
+                this.changeRoundsBeforeLongBreak(-1);
+              });
+            Text(`${this.config.roundsBeforeLongBreak} 次`)
+              .fontSize(15)
+              .fontColor('#1F2A2A')
+              .width(86)
+              .textAlign(TextAlign.Center);
+            Button('+')
+              .width(36)
+              .height(36)
+              .fontSize(20)
+              .fontColor('#FFFFFF')
+              .backgroundColor('#5F9E8A')
+              .borderRadius(18)
+              .onClick(() => {
+                this.changeRoundsBeforeLongBreak(1);
               });
           }
           .width('100%');

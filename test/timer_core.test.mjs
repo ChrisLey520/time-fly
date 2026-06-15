@@ -10,7 +10,15 @@ function createMemoryStorage() {
       accumulatedPausedMs: 0
     },
     sessions: [],
-    tasks: []
+    tasks: [],
+    progress: {
+      completedFocusRounds: 0
+    },
+    config: {
+      shortBreakMinutes: 5,
+      longBreakMinutes: 15,
+      roundsBeforeLongBreak: 4
+    }
   };
 }
 
@@ -76,12 +84,14 @@ function createTimerCore(storage, nowRef) {
       if (task) {
         task.completedFocusCount += 1;
       }
+      storage.progress.completedFocusRounds += 1;
+      const shouldUseLongBreak = storage.progress.completedFocusRounds % storage.config.roundsBeforeLongBreak === 0;
       storage.timerState = {
         id: '',
         mode: 'break',
         status: 'idle',
-        taskTitle: '歇息',
-        durationSeconds: 300,
+        taskTitle: shouldUseLongBreak ? '长歇息' : '歇息',
+        durationSeconds: (shouldUseLongBreak ? storage.config.longBreakMinutes : storage.config.shortBreakMinutes) * 60,
         accumulatedPausedMs: 0
       };
       return session;
@@ -164,11 +174,13 @@ function createTimerCore(storage, nowRef) {
   timer.restore();
   assert.equal(storage.timerState.status, 'idle');
   assert.equal(storage.timerState.mode, 'break');
+  assert.equal(storage.timerState.taskTitle, '歇息');
   assert.equal(timer.getRemainingSeconds(), 300);
   assert.equal(storage.sessions.length, 1);
   assert.equal(storage.sessions[0].status, 'completed');
   assert.equal(storage.sessions[0].actualDurationSeconds, 60);
   assert.equal(storage.tasks[0].completedFocusCount, 1);
+  assert.equal(storage.progress.completedFocusRounds, 1);
 }
 
 {
@@ -191,6 +203,34 @@ function createTimerCore(storage, nowRef) {
   assert.equal(session.actualDurationSeconds, 12);
   assert.equal(storage.timerState.status, 'idle');
   assert.equal(storage.tasks[0].completedFocusCount, 0);
+  assert.equal(storage.progress.completedFocusRounds, 0);
+}
+
+{
+  const storage = createMemoryStorage();
+  const nowRef = { now: 8_000_000 };
+  const timer = createTimerCore(storage, nowRef);
+
+  for (let i = 0; i < 4; i += 1) {
+    timer.startFocus(60);
+    nowRef.now += 60_000;
+    timer.restore();
+    if (i < 3) {
+      assert.equal(storage.timerState.taskTitle, '歇息');
+      storage.timerState = {
+        id: '',
+        mode: 'focus',
+        status: 'idle',
+        durationSeconds: 0,
+        accumulatedPausedMs: 0
+      };
+    }
+  }
+
+  assert.equal(storage.progress.completedFocusRounds, 4);
+  assert.equal(storage.timerState.mode, 'break');
+  assert.equal(storage.timerState.taskTitle, '长歇息');
+  assert.equal(storage.timerState.durationSeconds, 900);
 }
 
 console.log('timer core tests passed');

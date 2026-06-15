@@ -12,13 +12,23 @@ interface StorageKeys {
   timerState: string;
   sessions: string;
   tasks: string;
+  progress: string;
 }
 
 const STORAGE_KEYS: StorageKeys = {
   config: 'qishi.config',
   timerState: 'qishi.timerState',
   sessions: 'qishi.sessions',
-  tasks: 'qishi.tasks'
+  tasks: 'qishi.tasks',
+  progress: 'qishi.progress'
+};
+
+export interface PomodoroProgress {
+  completedFocusRounds: number;
+}
+
+const defaultPomodoroProgress: PomodoroProgress = {
+  completedFocusRounds: 0
 };
 
 export class StorageService {
@@ -101,6 +111,14 @@ export class StorageService {
 
   static async saveTasks(tasks: Task[]): Promise<void> {
     await StorageService.writeJson<Task[]>(STORAGE_KEYS.tasks, tasks);
+  }
+
+  static async getProgress(): Promise<PomodoroProgress> {
+    return StorageService.readJson<PomodoroProgress>(STORAGE_KEYS.progress, defaultPomodoroProgress);
+  }
+
+  static async saveProgress(progress: PomodoroProgress): Promise<void> {
+    await StorageService.writeJson<PomodoroProgress>(STORAGE_KEYS.progress, progress);
   }
 
   static async clearAll(): Promise<void> {
