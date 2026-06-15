@@ -1,9 +1,24 @@
 import { FocusSession } from '../models/FocusSession';
+import { AppStateService } from '../services/AppStateService';
+import { PromptService } from '../services/PromptService';
 import { SessionService } from '../services/SessionService';
 import { DayStats, GoalStats, StatsService, WeeklyStats } from '../services/StatsService';
+import { WidgetService } from '../services/WidgetService';
 import { formatClockTime, formatDuration } from '../utils/dateTime';
 
 type RecordFilter = 'all' | 'completed' | 'abandoned';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+interface SessionDayGroup {
+  startAt: number;
+  title: string;
+  detail: string;
+  sessions: FocusSession[];
+  focusSeconds: number;
+  completedCount: number;
+  abandonedCount: number;
+}
 
 @Component
 export struct RecordPage {
@@ -42,7 +57,7 @@ export struct RecordPage {
     this.stopTicker();
     this.ticker = setInterval(() => {
       this.loadSessions();
-    }, 1000);
+    }, 10000);
   }
 
   private stopTicker(): void {
@@ -68,10 +83,14 @@ export struct RecordPage {
 
   private filteredSessions(): FocusSession[] {
     if (this.selectedFilter === 'all') {
-      return this.sessions;
+      const allSessions = this.sessions.slice();
+      allSessions.sort((left: FocusSession, right: FocusSession) => right.endedAt - left.endedAt);
+      return allSessions;
     }
 
-    return this.sessions.filter((session: FocusSession) => session.status === this.selectedFilter);
+    const sessions = this.sessions.filter((session: FocusSession) => session.status === this.selectedFilter);
+    sessions.sort((left: FocusSession, right: FocusSession) => right.endedAt - left.endedAt);
+    return sessions;
   }
 
   private completedSessions(): FocusSession[] {
@@ -112,6 +131,22 @@ export struct RecordPage {
     return this.selectedFilter === filter ? '#FFFFFF' : '#1F2A2A';
   }
 
+  private filterEmptyText(): string {
+    if (this.sessions.length === 0) {
+      return '完成一段专注后，记录会出现在这里。';
+    }
+
+    if (this.selectedFilter === 'completed') {
+      return '还没有完成的专注记录。';
+    }
+
+    if (this.selectedFilter === 'abandoned') {
+      return '当前没有已结束记录。';
+    }
+
+    return '当前筛选下没有记录。';
+  }
+
   private goalProgressWidth(): string {
     return `${this.goalStats.progressPercent}%`;
   }
@@ -144,14 +179,155 @@ export struct RecordPage {
     return day.focusSeconds > 0 ? '#5F9E8A' : '#DDE8EA';
   }
 
+  private sessionDayStartAt(timestamp: number): number {
+    const date = new Date(timestamp);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  }
+
+  private sessionDayTitle(startAt: number): string {
+    const todayStart = this.sessionDayStartAt(Date.now());
+    if (startAt === todayStart) {
+      return '今天';
+    }
+
+    if (startAt === todayStart - DAY_MS) {
+      return '昨天';
+    }
+
+    const date = new Date(startAt);
+    return `${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+
+  private sessionDayDetail(startAt: number): string {
+    const date = new Date(startAt);
+    return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  }
+
+  private sessionGroups(): SessionDayGroup[] {
+    const sessions = this.filteredSessions();
+    const groups: SessionDayGroup[] = [];
+
+    sessions.forEach((session: FocusSession) => {
+      const startAt = this.sessionDayStartAt(session.endedAt);
+      let group = groups.find((item: SessionDayGroup) => item.startAt === startAt);
+      if (!group) {
+        group = {
+          startAt,
+          title: this.sessionDayTitle(startAt),
+          detail: this.sessionDayDetail(startAt),
+          sessions: [],
+          focusSeconds: 0,
+          completedCount: 0,
+          abandonedCount: 0
+        };
+        groups.push(group);
+      }
+
+      group.sessions.push(session);
+      if (session.status === 'completed') {
+        group.completedCount += 1;
+        group.focusSeconds += Math.max(0, Math.floor(session.actualDurationSeconds));
+      } else {
+        group.abandonedCount += 1;
+      }
+    });
+
+    return groups;
+  }
+
+  private sessionTitle(session: FocusSession): string {
+    return session.taskTitle ? session.taskTitle : '自由专注';
+  }
+
+  private sessionStatusText(session: FocusSession): string {
+    return session.status === 'completed' ? '已完成' : '已结束';
+  }
+
+  private sessionStatusColor(session: FocusSession): string {
+    return session.status === 'completed' ? '#5F9E8A' : '#C96F5D';
+  }
+
+  private sessionStatusBgColor(session: FocusSession): string {
+    return session.status === 'completed' ? '#EAF3F0' : '#FFF0EC';
+  }
+
+  private sessionMetaText(session: FocusSession): string {
+    return `${formatClockTime(session.startedAt)} - ${formatClockTime(session.endedAt)} · 计划 ${formatDuration(session.plannedDurationSeconds)}`;
+  }
+
+  private async deleteSession(session: FocusSession): Promise<void> {
+    const result = await PromptService.showDialog({
+      title: '删除这条记录？',
+      message: `${this.sessionTitle(session)} · ${formatDuration(session.actualDurationSeconds)}`,
+      buttons: [
+        {
+          text: '取消',
+          color: '#5F9E8A'
+        },
+        {
+          text: '删除',
+          color: '#C96F5D'
+        }
+      ]
+    });
+
+    if (result.index === 1) {
+      await SessionService.delete(session.id);
+      await this.loadSessions();
+      await WidgetService.refreshAllForms();
+      PromptService.showToast('已删除记录');
+    }
+  }
+
+  private async clearSessions(): Promise<void> {
+    const result = await PromptService.showDialog({
+      title: '清空全部记录？',
+      message: `将删除 ${this.sessions.length} 条专注记录，任务本身会保留。`,
+      buttons: [
+        {
+          text: '取消',
+          color: '#5F9E8A'
+        },
+        {
+          text: '清空',
+          color: '#C96F5D'
+        }
+      ]
+    });
+
+    if (result.index === 1) {
+      await SessionService.clearAll();
+      await this.loadSessions();
+      await WidgetService.refreshAllForms();
+      PromptService.showToast('记录已清空');
+    }
+  }
+
   build() {
     Scroll() {
       Column({ space: 18 }) {
-        Text('记录')
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#1F2A2A')
-          .width('100%');
+        Row() {
+          Text('记录')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#1F2A2A')
+            .layoutWeight(1);
+
+          if (this.sessions.length > 0) {
+            Button('清空')
+              .height(34)
+              .fontSize(13)
+              .fontColor('#C96F5D')
+              .backgroundColor('#FFF0EC')
+              .borderRadius(12)
+              .onClick(() => {
+                this.clearSessions();
+              });
+          }
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Center);
 
         Column({ space: 8 }) {
           Text('今日已专注')
@@ -365,11 +541,33 @@ export struct RecordPage {
         .width('100%');
 
         if (this.filteredSessions().length === 0) {
-          Text(this.sessions.length === 0 ? '完成一段专注后，记录会出现在这里。' : '当前筛选下没有记录。')
-            .fontSize(14)
-            .fontColor('#7B8785')
+          Column({ space: 12 }) {
+            Text(this.sessions.length === 0 ? '暂无记录' : '没有匹配记录')
+              .fontSize(18)
+              .fontWeight(FontWeight.Medium)
+              .fontColor('#1F2A2A');
+            Text(this.filterEmptyText())
+              .fontSize(14)
+              .fontColor('#7B8785')
+              .textAlign(TextAlign.Center);
+
+            Button(this.sessions.length === 0 ? '去专注' : '查看全部')
+              .height(38)
+              .fontSize(14)
+              .fontColor('#FFFFFF')
+              .backgroundColor('#5F9E8A')
+              .borderRadius(12)
+              .onClick(() => {
+                if (this.sessions.length === 0) {
+                  AppStateService.setSelectedTabIndex(0);
+                } else {
+                  this.selectedFilter = 'all';
+                }
+              });
+          }
             .width('100%')
             .padding(18)
+            .alignItems(HorizontalAlign.Center)
             .backgroundColor('#FFFFFF')
             .borderRadius(18)
             .border({
@@ -377,32 +575,87 @@ export struct RecordPage {
               color: '#DDE8EA'
             });
         } else {
-          ForEach(this.filteredSessions(), (session: FocusSession) => {
-            Row() {
-              Column({ space: 6 }) {
-                Text(session.taskTitle ? session.taskTitle : '自由专注')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#1F2A2A');
-                Text(`${formatClockTime(session.startedAt)} - ${formatClockTime(session.endedAt)}`)
-                  .fontSize(12)
-                  .fontColor('#7B8785');
-              }
-              .alignItems(HorizontalAlign.Start)
-              .layoutWeight(1);
+          ForEach(this.sessionGroups(), (group: SessionDayGroup) => {
+            Column({ space: 12 }) {
+              Row() {
+                Column({ space: 3 }) {
+                  Text(group.title)
+                    .fontSize(17)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor('#1F2A2A');
+                  Text(group.detail)
+                    .fontSize(11)
+                    .fontColor('#7B8785');
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1);
 
-              Column({ space: 6 }) {
-                Text(session.status === 'completed' ? '已完成' : '已结束')
-                  .fontSize(13)
-                  .fontColor(session.status === 'completed' ? '#5F9E8A' : '#C96F5D');
-                Text(formatDuration(session.actualDurationSeconds))
-                  .fontSize(12)
-                  .fontColor('#7B8785');
-                Text(`计划 ${formatDuration(session.plannedDurationSeconds)}`)
-                  .fontSize(11)
-                  .fontColor('#9AA6A3');
+                Column({ space: 3 }) {
+                  Text(formatDuration(group.focusSeconds))
+                    .fontSize(15)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor('#5F9E8A');
+                  Text(`完成 ${group.completedCount} / 结束 ${group.abandonedCount}`)
+                    .fontSize(11)
+                    .fontColor('#7B8785');
+                }
+                .alignItems(HorizontalAlign.End);
               }
-              .alignItems(HorizontalAlign.End);
+              .width('100%');
+
+              ForEach(group.sessions, (session: FocusSession) => {
+                Row({ space: 10 }) {
+                  Column({ space: 6 }) {
+                    Row({ space: 8 }) {
+                      Text(this.sessionTitle(session))
+                        .fontSize(15)
+                        .fontWeight(FontWeight.Medium)
+                        .fontColor('#1F2A2A')
+                        .maxLines(1)
+                        .textOverflow({ overflow: TextOverflow.Ellipsis })
+                        .layoutWeight(1);
+
+                      Text(this.sessionStatusText(session))
+                        .fontSize(11)
+                        .fontColor(this.sessionStatusColor(session))
+                        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                        .backgroundColor(this.sessionStatusBgColor(session))
+                        .borderRadius(10);
+                    }
+                    .width('100%');
+
+                    Text(this.sessionMetaText(session))
+                      .fontSize(12)
+                      .fontColor('#7B8785')
+                      .maxLines(1)
+                      .textOverflow({ overflow: TextOverflow.Ellipsis });
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1);
+
+                  Column({ space: 6 }) {
+                    Text(formatDuration(session.actualDurationSeconds))
+                      .fontSize(14)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor('#1F2A2A');
+
+                    Button('删除')
+                      .height(28)
+                      .fontSize(12)
+                      .fontColor('#C96F5D')
+                      .backgroundColor('#FFF0EC')
+                      .borderRadius(10)
+                      .onClick(() => {
+                        this.deleteSession(session);
+                      });
+                  }
+                  .alignItems(HorizontalAlign.End);
+                }
+                .width('100%')
+                .padding(14)
+                .backgroundColor('#F6F8F7')
+                .borderRadius(14);
+              }, (session: FocusSession) => session.id);
             }
             .width('100%')
             .padding(16)
@@ -412,7 +665,7 @@ export struct RecordPage {
               width: 1,
               color: '#DDE8EA'
             });
-          }, (session: FocusSession) => session.id);
+          }, (group: SessionDayGroup) => `${group.startAt}`);
         }
       }
       .width('100%')

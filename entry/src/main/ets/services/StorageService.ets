@@ -175,6 +175,15 @@ export class StorageService {
     await StorageService.saveSessions(sessions);
   }
 
+  static async deleteSession(sessionId: string): Promise<void> {
+    const sessions = await StorageService.getSessions();
+    await StorageService.saveSessions(sessions.filter((session: FocusSession) => session.id !== sessionId));
+  }
+
+  static async clearSessions(): Promise<void> {
+    await StorageService.saveSessions([]);
+  }
+
   static async getTasks(): Promise<Task[]> {
     return StorageService.readJson<Task[]>(STORAGE_KEYS.tasks, []);
   }
